@@ -311,7 +311,7 @@
   // ==== SESUAIKAN INI KALAU KONTRAK BACKEND BEDA ====
   // isi origin backend di sini kalau index.html ini dibuka terpisah dari server
   // (mis. lewat live-server / file://). Kosongin ('') kalau nanti backend yang serve file ini.
-  const API_BASE = process.env.BACKEND_URL || 'http://localhost:3000';
+  const API_BASE = 'https://shrnk-production.up.railway.app' || 'http://localhost:3000';
   const ENDPOINTS = {
     create: `${API_BASE}/api/links`,
     health: `${API_BASE}/health`,
