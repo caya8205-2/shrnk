@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>shrnk_ // url shortener</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;0,800;1,400&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a0d0a;
+    --bg-panel:#0f140f;
+    --line:#1c261c;
+    --green:#39ff88;
+    --green-dim:#1e9955;
+    --amber:#ffb347;
+    --red:#ff5c5c;
+    --fg:#c9f5d6;
+    --fg-dim:#5f8a6c;
+    --mono: 'JetBrains Mono', 'Space Mono', monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--fg);
+    font-family:var(--mono);
+    min-height:100vh;
+    position:relative;
+    overflow-x:hidden;
+  }
+  /* scanline + noise overlay */
+  body::before{
+    content:"";
+    position:fixed; inset:0;
+    background:repeating-linear-gradient(
+      to bottom,
+      rgba(57,255,136,0.035) 0px,
+      rgba(57,255,136,0.035) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+    pointer-events:none;
+    z-index:50;
+    mix-blend-mode:overlay;
+  }
+  body::after{
+    content:"";
+    position:fixed; inset:0;
+    background:radial-gradient(ellipse at 20% -10%, rgba(57,255,136,0.08), transparent 45%),
+               radial-gradient(ellipse at 100% 110%, rgba(255,179,71,0.06), transparent 50%);
+    pointer-events:none;
+    z-index:0;
+  }
+
+  .wrap{
+    position:relative;
+    z-index:1;
+    max-width:760px;
+    margin:0 auto;
+    padding:56px 24px 80px;
+  }
+
+  header{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    border-bottom:1px dashed var(--line);
+    padding-bottom:18px;
+    margin-bottom:36px;
+  }
+  .logo{
+    font-size:22px;
+    font-weight:800;
+    letter-spacing:-0.5px;
+    color:var(--green);
+    text-shadow:0 0 18px rgba(57,255,136,0.35);
+  }
+  .logo span{color:var(--fg-dim); font-weight:400;}
+  .badge{
+    font-size:11px;
+    color:var(--fg-dim);
+    border:1px solid var(--line);
+    padding:4px 10px;
+    border-radius:2px;
+    letter-spacing:1px;
+  }
+  .badge b{color:var(--amber); font-weight:700;}
+
+  .prompt-line{
+    font-size:13px;
+    color:var(--fg-dim);
+    margin-bottom:10px;
+  }
+  .prompt-line::before{content:"$ "; color:var(--green);}
+
+  form{
+    display:flex;
+    gap:10px;
+    margin-bottom:14px;
+  }
+  input[type=text]{
+    flex:1;
+    background:var(--bg-panel);
+    border:1px solid var(--line);
+    color:var(--fg);
+    font-family:var(--mono);
+    font-size:15px;
+    padding:14px 16px;
+    border-radius:3px;
+    outline:none;
+    transition:border-color .15s, box-shadow .15s;
+  }
+  input[type=text]::placeholder{color:#3a4d3f;}
+  input[type=text]:focus{
+    border-color:var(--green-dim);
+    box-shadow:0 0 0 3px rgba(57,255,136,0.08);
+  }
+  input[type=text].err{border-color:var(--red);}
+
+  button{
+    background:var(--green);
+    color:#04170c;
+    border:none;
+    font-family:var(--mono);
+    font-weight:800;
+    font-size:14px;
+    letter-spacing:0.5px;
+    padding:0 22px;
+    border-radius:3px;
+    cursor:pointer;
+    transition:transform .1s ease, background .15s;
+    white-space:nowrap;
+  }
+  button:hover{background:#5fffa4;}
+  button:active{transform:scale(0.97);}
+  button:disabled{
+    background:var(--fg-dim);
+    cursor:not-allowed;
+  }
+
+  .msg{
+    font-size:12.5px;
+    min-height:18px;
+    margin-bottom:22px;
+    color:var(--fg-dim);
+  }
+  .msg.error{color:var(--red);}
+  .msg.ok{color:var(--green);}
+
+  .section-title{
+    font-size:11px;
+    letter-spacing:2px;
+    color:var(--fg-dim);
+    text-transform:uppercase;
+    margin:36px 0 12px;
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  .section-title::after{
+    content:"";
+    flex:1;
+    height:1px;
+    background:var(--line);
+  }
+
+  .card{
+    background:var(--bg-panel);
+    border:1px solid var(--line);
+    border-radius:4px;
+    padding:18px 18px;
+    margin-bottom:14px;
+    position:relative;
+    animation:reveal .35s ease both;
+  }
+  @keyframes reveal{
+    from{opacity:0; transform:translateY(6px);}
+    to{opacity:1; transform:translateY(0);}
+  }
+  .card-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:12px;
+    margin-bottom:8px;
+  }
+  .short-url{
+    color:var(--green);
+    font-weight:700;
+    font-size:15px;
+    text-decoration:none;
+    word-break:break-all;
+  }
+  .short-url:hover{text-decoration:underline;}
+  .orig-url{
+    font-size:12px;
+    color:var(--fg-dim);
+    word-break:break-all;
+    line-height:1.5;
+  }
+  .card-actions{
+    display:flex;
+    gap:8px;
+    flex-shrink:0;
+  }
+  .icon-btn{
+    background:transparent;
+    border:1px solid var(--line);
+    color:var(--fg-dim);
+    font-family:var(--mono);
+    font-size:11px;
+    padding:6px 10px;
+    border-radius:3px;
+    cursor:pointer;
+    transition:all .15s;
+  }
+  .icon-btn:hover{
+    border-color:var(--green-dim);
+    color:var(--green);
+  }
+  .icon-btn.danger:hover{
+    border-color:var(--red);
+    color:var(--red);
+  }
+  .meta{
+    font-size:10.5px;
+    color:#3a4d3f;
+    margin-top:6px;
+    letter-spacing:0.3px;
+  }
+
+  .empty{
+    text-align:center;
+    padding:50px 20px;
+    color:var(--fg-dim);
+    font-size:13px;
+    border:1px dashed var(--line);
+    border-radius:4px;
+  }
+  .empty .glyph{
+    font-size:28px;
+    display:block;
+    margin-bottom:10px;
+    color:var(--green-dim);
+  }
+
+  .cursor-blink{
+    display:inline-block;
+    width:8px; height:14px;
+    background:var(--green);
+    animation:blink 1s steps(1) infinite;
+    vertical-align:-2px;
+    margin-left:2px;
+  }
+  @keyframes blink{50%{opacity:0;}}
+
+  .config-note{
+    font-size:10.5px;
+    color:#3a4d3f;
+    margin-top:40px;
+    border-top:1px dashed var(--line);
+    padding-top:14px;
+    line-height:1.6;
+  }
+  .config-note code{
+    color:var(--amber);
+    background:rgba(255,179,71,0.08);
+    padding:1px 5px;
+    border-radius:2px;
+  }
+
+  @media (max-width:520px){
+    form{flex-direction:column;}
+    button{padding:14px;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="logo">shrnk_<span>://</span></div>
+    <div class="badge">status: <b id="apiStatus">checking</b></div>
+  </header>
+
+  <div class="prompt-line">paste tautan panjangmu, biar dipendekin</div>
+  <form id="shortenForm" autocomplete="off">
+    <input type="text" id="urlInput" placeholder="https://contoh.com/artikel/yang-url-nya-panjang-banget" />
+    <button type="submit" id="submitBtn">pendekin<span class="cursor-blink"></span></button>
+  </form>
+  <div class="msg" id="formMsg"></div>
+
+  <div class="section-title">riwayat</div>
+  <div id="list">
+    <div class="empty"><span class="glyph">⌁</span>belum ada link yang dipendekin</div>
+  </div>
+
+  <div class="config-note">
+    <code>POST /api/links</code> { url, slug? } → { slug, shortUrl } &middot;
+    <code>GET /api/links</code> list &middot;
+    <code>DELETE /api/links/:id</code> hapus &middot;
+    <code>GET /:slug</code> redirect + hitung klik.<br>
+    DB jadi source of truth — riwayat selalu di-fetch ulang dari <code>GET /api/links</code>.
+  </div>
+
+</div>
+
+<script>
+  // ==== SESUAIKAN INI KALAU KONTRAK BACKEND BEDA ====
+  // isi origin backend di sini kalau index.html ini dibuka terpisah dari server
+  // (mis. lewat live-server / file://). Kosongin ('') kalau nanti backend yang serve file ini.
+  const API_BASE = 'http://localhost:3000';
+  const ENDPOINTS = {
+    create: `${API_BASE}/api/links`,
+    health: `${API_BASE}/health`,
+  };
+  const STORAGE_KEY = 'shrnk_history';
+  // ===================================================
+
+  const form = document.getElementById('shortenForm');
+  const input = document.getElementById('urlInput');
+  const submitBtn = document.getElementById('submitBtn');
+  const formMsg = document.getElementById('formMsg');
+  const list = document.getElementById('list');
+  const apiStatus = document.getElementById('apiStatus');
+
+  let items = [];
+
+  async function loadLinks(){
+    const res = await fetch(`${API_BASE}/api/links`, { method:'GET' });
+    const data = await res.json();
+    items = data.map(link => ({
+      id: link.id,
+      slug: link.slug,
+      shortUrl: `${API_BASE}/${link.slug}`,
+      originalUrl: link.url,
+      createdAt: link.createdAt,
+      clicks: link.clicks,
+    }));
+
+    render();
+  }
+
+  function isValidUrl(str){
+    try{
+      const u = new URL(str);
+      return u.protocol === 'http:' || u.protocol === 'https:';
+    }catch{ return false; }
+  }
+
+  function fmtDate(value){
+    if(!value) return '';
+    try{
+      // sqlite nyimpen createdAt sbg unix epoch detik, JS Date butuh milidetik
+      const ms = typeof value === 'number' ? value * 1000 : value;
+      const d = new Date(ms);
+      return d.toLocaleString('id-ID', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+    }catch{ return value; }
+  }
+
+  function render(){
+    if(!items.length){
+      list.innerHTML = `<div class="empty"><span class="glyph">⌁</span>belum ada link yang dipendekin</div>`;
+      return;
+    }
+    list.innerHTML = items.map((it, i) => `
+      <div class="card" style="animation-delay:${i * 30}ms">
+        <div class="card-top">
+          <a class="short-url" href="${it.shortUrl}" target="_blank" rel="noopener">${it.shortUrl}</a>
+          <div class="card-actions">
+            <button class="icon-btn" data-copy="${it.shortUrl}">copy</button>
+            <button class="icon-btn danger" data-del="${it.id}">del</button>
+          </div>
+        </div>
+        <div class="orig-url">→ ${it.originalUrl}</div>
+        <div class="meta">${it.createdAt ? `dibuat ${fmtDate(it.createdAt)}` : ''}${typeof it.clicks === 'number' ? ` · ${it.clicks} klik` : ''}</div>
+      </div>
+    `).join('');
+  }
+
+  async function checkApi(){
+    try{
+      const res = await fetch(ENDPOINTS.health, { method:'GET' });
+      if(!res.ok) throw new Error('bad status');
+      apiStatus.textContent = 'connected';
+      apiStatus.style.color = 'var(--green)';
+    }catch(e){
+      apiStatus.textContent = 'offline';
+      apiStatus.style.color = 'var(--red)';
+    }
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const url = input.value.trim();
+    formMsg.className = 'msg';
+    formMsg.textContent = '';
+
+    if(!url){
+      input.classList.add('err');
+      formMsg.className = 'msg error';
+      formMsg.textContent = 'isi dulu URL-nya';
+      return;
+    }
+    if(!isValidUrl(url)){
+      input.classList.add('err');
+      formMsg.className = 'msg error';
+      formMsg.textContent = 'format URL nggak valid (harus ada http:// atau https://)';
+      return;
+    }
+    input.classList.remove('err');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'proses...';
+
+    try{
+      const res = await fetch(ENDPOINTS.create, {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json' },
+        body: JSON.stringify({ url })
+      });
+      if(!res.ok){
+        const errBody = await res.json().catch(() => ({}));
+        // controller ngebalikin { message: zodError.flatten() } pas 400
+        const fieldErr = errBody?.message?.fieldErrors?.url?.[0];
+        throw new Error(fieldErr || (typeof errBody?.message === 'string' ? errBody.message : `server balas ${res.status}`));
+      }
+      const data = await res.json(); // { slug, shortUrl }
+      await loadLinks();
+      input.value = '';
+      formMsg.className = 'msg ok';
+      formMsg.textContent = 'sip, link udah jadi pendek';
+    }catch(err){
+      formMsg.className = 'msg error';
+      formMsg.textContent = `gagal: ${err.message}`;
+    }finally{
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = 'pendekin<span class="cursor-blink"></span>';
+    }
+  });
+
+  list.addEventListener('click', async (e) => {
+    const copyTarget = e.target.closest('[data-copy]');
+    const delTarget = e.target.closest('[data-del]');
+
+    if(copyTarget){
+      const val = copyTarget.getAttribute('data-copy');
+      try{
+        await navigator.clipboard.writeText(val);
+        const orig = copyTarget.textContent;
+        copyTarget.textContent = 'copied';
+        setTimeout(() => copyTarget.textContent = orig, 1200);
+      }catch{}
+    }
+
+    if(delTarget){
+      const id = delTarget.getAttribute('data-del');
+      delTarget.textContent = '...';
+      try{
+        const res = await fetch(`${API_BASE}/api/links/${id}`, { method:'DELETE' });
+        if(!res.ok) throw new Error();
+        await loadLinks();
+      }catch{
+        delTarget.textContent = 'del';
+        formMsg.className = 'msg error';
+        formMsg.textContent = 'gagal hapus, coba lagi';
+      }
+    }
+  });
+
+  input.addEventListener('input', () => input.classList.remove('err'));
+
+  checkApi();
+  loadLinks();
+</script>
+</body>
+</html>
